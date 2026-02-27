@@ -164,7 +164,7 @@ Then, open `AppDelegate.h` and import `WXApi.h` at the beginning.
 ```objective-c
 #import <React/RCTBridgeDelegate.h>
 #import <UIKit/UIKit.h>
-#import "WXApi.h"
+#import "WechatOpenSDK/WXApi.h"
 ```
 
 After that, add the protocol `WXApiDelegate` to `UIResponder`.
@@ -178,7 +178,7 @@ The file will look like this:
 ```objective-c
 #import <React/RCTBridgeDelegate.h>
 #import <UIKit/UIKit.h>
-#import "WXApi.h"
+#import "WechatOpenSDK/WXApi.h"
 
 @interface AppDelegate : UIResponder <UIApplicationDelegate, RCTBridgeDelegate, WXApiDelegate>
 
@@ -194,7 +194,7 @@ The modification of `AppDelegate.m` is the same as described above.
 Import two headers `WXApi.h` and `<React/RCTLinkingManager.h>`. And add `WXApiDelegate` to `RCTAppDelegate`.
 
 ```objective-c
-#import "WXApi.h"
+#import "WechatOpenSDK/WXApi.h"
 #import <React/RCTLinkingManager.h>
 
 @interface AppDelegate : RCTAppDelegate<WXApiDelegate>
@@ -202,231 +202,74 @@ Import two headers `WXApi.h` and `<React/RCTLinkingManager.h>`. And add `WXApiDe
 @end
 ```
 
-## iOS (New Architecture)
+## iOS with AppDelegate.swift (React Native 0.74+)
 
-First, find `AppDelegate.m` inside `ios` folder, and rename it to `AppDelegate.mm`.
+### 1. Update Class Definition
 
-Then, import headers and extend AppDelegate interface at the top of the file.
+First, import the SDK and add the `WXApiDelegate` protocol to your `AppDelegate` class.
 
-```objective-c
-#if RCT_NEW_ARCH_ENABLED
-#import <React/CoreModulesPlugins.h>
-#import <React/RCTCxxBridgeDelegate.h>
-#import <React/RCTFabricSurfaceHostingProxyRootView.h>
-#import <React/RCTSurfacePresenter.h>
-#import <React/RCTSurfacePresenterBridgeAdapter.h>
-#import <ReactCommon/RCTTurboModuleManager.h>
+```swift
+import WechatOpenSDK
 
-#import <react/config/ReactNativeConfig.h>
-
-static NSString *const kRNConcurrentRoot = @"concurrentRoot";
-
-@interface AppDelegate () <RCTCxxBridgeDelegate, RCTTurboModuleManagerDelegate> {
-  RCTTurboModuleManager *_turboModuleManager;
-  RCTSurfacePresenterBridgeAdapter *_bridgeAdapter;
-  std::shared_ptr<const facebook::react::ReactNativeConfig> _reactNativeConfig;
-  facebook::react::ContextContainer::Shared _contextContainer;
+@main
+class AppDelegate: UIResponder, UIApplicationDelegate, WXApiDelegate {
+  // ...
 }
-@end
-#endif
+
 ```
 
-Find the method declared as `- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions`, and setup some properties for the new architecture.
+### 2. Implement URL Handling
 
-```objective-c
-- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
-{
-  RCTAppSetupPrepareApp(application);
+Add the following methods to handle incoming URLs. This ensures that callbacks from WeChat (like payment results or login responses) are intercepted by the SDK, while other deep links continue to function within React Native.
 
-  RCTBridge *bridge = [[RCTBridge alloc] initWithDelegate:self launchOptions:launchOptions];
-
-#if RCT_NEW_ARCH_ENABLED
-  _contextContainer = std::make_shared<facebook::react::ContextContainer const>();
-  _reactNativeConfig = std::make_shared<facebook::react::EmptyReactNativeConfig const>();
-  _contextContainer->insert("ReactNativeConfig", _reactNativeConfig);
-  _bridgeAdapter = [[RCTSurfacePresenterBridgeAdapter alloc] initWithBridge:bridge contextContainer:_contextContainer];
-  bridge.surfacePresenter = _bridgeAdapter.surfacePresenter;
-#endif
-
-// ...
-```
-
-Insert the code below into `@implementation AppDelegate` to implement specific methods.
-
-```objective-c
-#if RCT_NEW_ARCH_ENABLED
-
-#pragma mark - RCTCxxBridgeDelegate
-
-- (std::unique_ptr<facebook::react::JSExecutorFactory>)jsExecutorFactoryForBridge:(RCTBridge *)bridge
-{
-  _turboModuleManager = [[RCTTurboModuleManager alloc] initWithBridge:bridge
-                                                             delegate:self
-                                                            jsInvoker:bridge.jsCallInvoker];
-  return RCTAppSetupDefaultJsExecutorFactory(bridge, _turboModuleManager);
-}
-
-#pragma mark RCTTurboModuleManagerDelegate
-
-- (Class)getModuleClassFromName:(const char *)name
-{
-  return RCTCoreModulesClassProvider(name);
-}
-
-- (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:(const std::string &)name
-                                                      jsInvoker:(std::shared_ptr<facebook::react::CallInvoker>)jsInvoker
-{
-  return nullptr;
-}
-
-- (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:(const std::string &)name
-                                                     initParams:
-                                                         (const facebook::react::ObjCTurboModule::InitParams &)params
-{
-  return nullptr;
-}
-
-- (id<RCTTurboModule>)getModuleInstanceFromClass:(Class)moduleClass
-{
-  return RCTAppSetupDefaultModuleFromClass(moduleClass);
-}
-
-#endif
-```
-
-The file should look like this:
-```objective-c
-#import "AppDelegate.h"
-
-#import <React/RCTBridge.h>
-#import <React/RCTRootView.h>
-#import <React/RCTLinkingManager.h>
-
-#import <React/RCTAppSetupUtils.h>
-
-#if RCT_NEW_ARCH_ENABLED
-#import <React/CoreModulesPlugins.h>
-#import <React/RCTCxxBridgeDelegate.h>
-#import <React/RCTFabricSurfaceHostingProxyRootView.h>
-#import <React/RCTSurfacePresenter.h>
-#import <React/RCTSurfacePresenterBridgeAdapter.h>
-#import <ReactCommon/RCTTurboModuleManager.h>
-
-#import <react/config/ReactNativeConfig.h>
-
-static NSString *const kRNConcurrentRoot = @"concurrentRoot";
-
-@interface AppDelegate () <RCTCxxBridgeDelegate, RCTTurboModuleManagerDelegate> {
-  RCTTurboModuleManager *_turboModuleManager;
-  RCTSurfacePresenterBridgeAdapter *_bridgeAdapter;
-  std::shared_ptr<const facebook::react::ReactNativeConfig> _reactNativeConfig;
-  facebook::react::ContextContainer::Shared _contextContainer;
-}
-@end
-#endif
-
-@implementation AppDelegate
-
-- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
-{
-  RCTAppSetupPrepareApp(application);
-
-  RCTBridge *bridge = [[RCTBridge alloc] initWithDelegate:self launchOptions:launchOptions];
-
-#if RCT_NEW_ARCH_ENABLED
-  _contextContainer = std::make_shared<facebook::react::ContextContainer const>();
-  _reactNativeConfig = std::make_shared<facebook::react::EmptyReactNativeConfig const>();
-  _contextContainer->insert("ReactNativeConfig", _reactNativeConfig);
-  _bridgeAdapter = [[RCTSurfacePresenterBridgeAdapter alloc] initWithBridge:bridge contextContainer:_contextContainer];
-  bridge.surfacePresenter = _bridgeAdapter.surfacePresenter;
-#endif
-
-  NSDictionary *initProps = [self prepareInitialProps];
-  UIView *rootView = RCTAppSetupDefaultRootView(bridge, @"<Your Project Name>", initProps);
-
-  if (@available(iOS 13.0, *)) {
-    rootView.backgroundColor = [UIColor systemBackgroundColor];
-  } else {
-    rootView.backgroundColor = [UIColor whiteColor];
+```swift
+  func application(
+    _ app: UIApplication,
+    open url: URL,
+    options: [UIApplication.OpenURLOptionsKey: Any] = [:]
+  ) -> Bool {
+    let handledByWeChat = WXApi.handleOpen(url, delegate: self)
+    let handledByReactNative = RCTLinkingManager.application(app, open: url, options: options)
+    
+    return handledByWeChat || handledByReactNative
+  }
+  
+  func application(
+    _ application: UIApplication,
+    open url: URL,
+    sourceApplication: String?,
+    annotation: Any
+  ) -> Bool {
+    let handledByWeChat = WXApi.handleOpen(url, delegate: self)
+    let handledByReactNative = RCTLinkingManager.application(
+      application,
+      open: url,
+      sourceApplication: sourceApplication,
+      annotation: annotation
+    )
+    
+    return handledByWeChat || handledByReactNative
   }
 
-  self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-  UIViewController *rootViewController = [UIViewController new];
-  rootViewController.view = rootView;
-  self.window.rootViewController = rootViewController;
-  [self.window makeKeyAndVisible];
-  return YES;
-}
-
-// ...
-
-#if RCT_NEW_ARCH_ENABLED
-
-#pragma mark - RCTCxxBridgeDelegate
-
-- (std::unique_ptr<facebook::react::JSExecutorFactory>)jsExecutorFactoryForBridge:(RCTBridge *)bridge
-{
-  _turboModuleManager = [[RCTTurboModuleManager alloc] initWithBridge:bridge
-                                                             delegate:self
-                                                            jsInvoker:bridge.jsCallInvoker];
-  return RCTAppSetupDefaultJsExecutorFactory(bridge, _turboModuleManager);
-}
-a
-#pragma mark RCTTurboModuleManagerDelegate
-
-- (Class)getModuleClassFromName:(const char *)name
-{
-  return RCTCoreModulesClassProvider(name);
-}
-
-- (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:(const std::string &)name
-                                                      jsInvoker:(std::shared_ptr<facebook::react::CallInvoker>)jsInvoker
-{
-  return nullptr;
-}
-
-- (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:(const std::string &)name
-                                                     initParams:
-                                                         (const facebook::react::ObjCTurboModule::InitParams &)params
-{
-  return nullptr;
-}
-
-- (id<RCTTurboModule>)getModuleInstanceFromClass:(Class)moduleClass
-{
-  return RCTAppSetupDefaultModuleFromClass(moduleClass);
-}
-
-#endif
-
-- (BOOL)application:(UIApplication *)application
-   openURL:(NSURL *)url
-   options:(NSDictionary<UIApplicationOpenURLOptionsKey,id> *)options
-{
-  [WXApi handleOpenURL:url delegate:self];
-  
-  return [RCTLinkingManager application:application openURL:url options:options];
-}
-
-- (BOOL)application:(UIApplication *)application openURL:(NSURL *)url
-  sourceApplication:(NSString *)sourceApplication annotation:(id)annotation
-{
-  return [WXApi handleOpenURL:url delegate:self];
-}
-
-- (BOOL)application:(UIApplication *)application continueUserActivity:(nonnull NSUserActivity *)userActivity
- restorationHandler:(nonnull void (^)(NSArray<id<UIUserActivityRestoring>> * _Nullable))restorationHandler
-{
-  [RCTLinkingManager application:application
-                  continueUserActivity:userActivity
-                    restorationHandler:restorationHandler];
-  
-  return [WXApi handleOpenUniversalLink:userActivity delegate:self];
-}
-
-@end
 ```
 
-The rest steps are the same as in the [iOS](/guide/configuration.html#ios) section.
+### 3. Handle Universal Links (Recommended)
 
+Since WeChat now requires **Universal Links** for integration, you should also override the `continueUserActivity` method:
 
+```swift
+  func application(
+    _ application: UIApplication,
+    continue userActivity: NSUserActivity,
+    restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void
+  ) -> Bool {
+    let handledByWeChat = WXApi.handleOpenUniversalLink(userActivity, delegate: self)
+    let handledByReactNative = RCTLinkingManager.application(
+      application,
+      continue: userActivity,
+      restorationHandler: restorationHandler
+    )
+    
+    return handledByWeChat || handledByReactNative
+  }
+```
